@@ -1,0 +1,100 @@
+# include <fstream>
+# include <omp.h>
+#include <chrono>
+#include <iostream>
+using namespace std::chrono;
+using namespace std;
+
+
+double** allocate_matrix(int n, int m) {
+	double** result = new double* [n];
+	for (int i = 0; i < n; i++) {
+		result[i] = new double[m];
+	}
+	return result;
+}
+
+void deallocate_matrix(double** a, int n) {
+	for (int i = 0; i < n; i++) {
+		delete[] a[i];
+	}
+	delete[] a;
+}
+
+class matrix {
+
+public:
+	double** data;
+	int n;
+	int m;
+
+	matrix(int n, int m)
+	{
+		data = allocate_matrix(n, m);
+		this->n = n;
+		this->m = m;
+	}
+
+	~matrix() {
+		deallocate_matrix(this->data, this->n);
+	}
+
+};
+
+
+microseconds multiply(double** a, double** b, int n, int m, int t, double** c) {
+	auto start = high_resolution_clock::now();
+{{ outer }}
+	for (int l = 0; l < n * t; l++) {
+		int i = l % n;
+		int j = l / n;
+		c[i][j] = 0.0;
+{{ inner }}
+		for (int k = 0; k < m; k++)
+		{
+			c[i][j] = c[i][j] + a[i][k] * b[k][j];
+		}
+	}
+	auto stop = high_resolution_clock::now();
+	auto duration = duration_cast<microseconds>(stop - start);
+	return duration;
+}
+
+matrix* multiply_matricies(matrix* a, matrix* b) {
+	matrix* c = new matrix(a->n, b->m);
+	auto duration = multiply(a->data, b->data, a->n, a->m, b->m, c->data);
+	cout << duration.count() << endl;
+	return c;
+}
+
+matrix* read_matrix_from_file(string filename) {
+	int n, m;
+	ifstream f(filename);
+	f >> n >> m;
+	auto result = new matrix(n, m);
+	for (int i = 0; i < n; i++) {
+		for (int j = 0; j < m; j++) {
+			f >> result->data[i][j];
+		}
+	}
+	return result;
+}
+
+
+int main(int argc, char** argv) {
+
+	string a_filename = argv[1];
+	string b_filename = argv[2];
+
+	matrix* a = read_matrix_from_file(a_filename);
+	matrix* b = read_matrix_from_file(b_filename);
+
+	omp_set_num_threads({{ threads }});
+	matrix* c = multiply_matricies(a, b);
+
+	delete a;
+	delete b;
+	delete c;
+    return 0;
+}
+

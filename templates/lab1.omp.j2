@@ -1,0 +1,1 @@
+#pragma omp parallel for schedule({{ schedule_type }}{{ ', ' if chunk_size else '' }}{{ chunk_size }})
