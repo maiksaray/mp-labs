@@ -39,6 +39,7 @@ class Runner:
 
     def write_matrix(self, matrix, file):
         file.write(f"{len(matrix)} {len(matrix[0]) if matrix else ''}\n")
+        file.write(f"{len(matrix)} {len(matrix[0]) if matrix else ''}\n")
         for row in matrix:
             for item in row:
                 file.write(f"{item:.2f} ")
