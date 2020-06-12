@@ -16,7 +16,7 @@ def get_ranges(len, n):
     leftovers = len - l * n
     this_start = 0
     for i in range(n):
-        this_len = l if i < leftovers else l + 1
+        this_len = l if i >= leftovers else l + 1
         yield this_start, this_start + this_len
         this_start = this_start + this_len
 
@@ -48,11 +48,20 @@ def sssp_dijkstra_parallel(graph, start, comm):
 
     for _ in range(order):
         log(f"{rank}: iter {_}")
-        index, value = next_min_distance(distances[rank_slice], visited[rank_slice])
-        log(f"{rank}: local min: {index}:{value}")
+
+        min_index = -1
+        min_value = sys.maxsize
+        for i in range(rank_slice.start, rank_slice.stop - 1):
+            if distances[i] < min_value and not visited[i]:
+                min_index = i
+                min_value = distances[i]
+
+        # min_index, min_value = next_min_distance(distances[rank_slice], visited[rank_slice])
+        log(f"{rank}: local min: {min_index}:{min_value}")
         log(f"{rank}: distances {distances[rank_slice]}")
-        mins = comm.gather((index + rank_slice.start, value), root=0)
-        # take index of min by value
+        mins = comm.gather((min_index, min_value), root=0)
+        # mins = comm.gather((min_index + rank_slice.start, min_value), root=0)
+        # take min_index of min by min_value
         log(f"{rank}: gathered mins {mins}")
         current_vertex = min(mins, key=lambda t: t[1]) if not rank else (0, 0)
         # log(current_vertex)
@@ -61,17 +70,17 @@ def sssp_dijkstra_parallel(graph, start, comm):
 
         visited[current_vertex] = True
 
-        for index, edge_weight in enumerate(graph[current_vertex][rank_slice]):
-            index += rank_slice.start
+        for min_index, edge_weight in enumerate(graph[current_vertex][rank_slice]):
+            min_index += rank_slice.start
             if edge_weight and \
-                    not visited[index]:
+                    not visited[min_index]:
                 # can be done with single if
                 # But only 3.8+ supports walrus operator
-                # (new_weight := distances[current_vertex] + edge_weight) < distances[index]:
+                # (new_weight := distances[current_vertex] + edge_weight) < distances[min_index]:
                 new_weight = distances[current_vertex] + edge_weight
-                if new_weight < distances[index]:
-                    log(f"{rank}: updating: {index} with {new_weight}")
-                    distances[index] = new_weight
+                if new_weight < distances[min_index]:
+                    log(f"{rank}: updating: {min_index} with {new_weight}")
+                    distances[min_index] = new_weight
 
         log(f"{rank}:sending {distances[rank_slice]}")
         new_distances = comm.allgather(distances[rank_slice])
