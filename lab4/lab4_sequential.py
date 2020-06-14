@@ -1,5 +1,8 @@
+import argparse
 import sys
 from datetime import datetime
+
+import numpy as np
 
 
 def sssp_dijkstra(graph, start):
@@ -36,21 +39,15 @@ def sssp_dijkstra(graph, start):
     return distances, datetime.now() - start
 
 
-size = 4
-graph = [[0 for column in range(size)]
-         for row in range(size)]
 
-graph = [[0, 4, 0, 0, 0, 0, 0, 8, 0],
-         [4, 0, 8, 0, 0, 0, 0, 11, 0],
-         [0, 8, 0, 7, 0, 4, 0, 0, 2],
-         [0, 0, 7, 0, 9, 14, 0, 0, 0],
-         [0, 0, 0, 9, 0, 10, 0, 0, 0],
-         [0, 0, 4, 14, 10, 0, 2, 0, 0],
-         [0, 0, 0, 0, 0, 2, 0, 1, 6],
-         [8, 11, 0, 0, 0, 0, 1, 0, 7],
-         [0, 0, 2, 0, 0, 0, 6, 7, 0]
-         ]
+parser = argparse.ArgumentParser(description='Run lab3 list implementation')
+parser.add_argument('--graph', dest='graph', help='filename with the graph', )
+parser.add_argument('--debug', dest='debug', action='store_true')
+
+args = parser.parse_args()
+
+graph = np.loadtxt(args.graph) if args.graph else np.loadtxt("data\\800")
 
 a, elapsed = sssp_dijkstra(graph, 0)
 
-print(elapsed)
+print(elapsed.total_seconds() * 1000)
