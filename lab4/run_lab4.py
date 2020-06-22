@@ -67,4 +67,4 @@ for size in sizes:
         print(f"{size}|{thread} np:{avg_for_np}ms")
 
         avg_for_list = avg(list(map(float, lst_res)))
-        print(f"{size}|{thread} np:{avg_for_list}ms")
+        print(f"{size}|{thread} list:{avg_for_list}ms")

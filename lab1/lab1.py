@@ -22,6 +22,10 @@ def schedule_string(schedule):
     return f"{schedule['schedule_type']}" + \
            (f"-chunk{schedule['chunk_size']}" if 'chunk_size' in schedule else "")
 
+def avg(nums):
+    nums.remove(max(nums))
+    nums.remove(min(nums))
+    return sum(nums) / len(nums)
 
 class Runner:
 
@@ -62,12 +66,13 @@ class Runner:
 
         self.compile_src(src_dir, src_name)
 
-        print("Compiled, doing stuff...")
         results = dict()
 
         start = datetime.now()
         for size_spec in sizes:
-            duration = self.perform_single_run(path.join(src_dir, src_name.replace(".cpp", ".exe")), size_spec)
+            durations = [self.perform_single_run(path.join(src_dir, src_name.replace(".cpp", ".exe")), size_spec)
+                         for _ in range(5)]
+            duration = avg(list(map(float, durations)))
             results.update({size_string(size_spec): duration})
         end = datetime.now()
         print(end - start)
@@ -76,10 +81,11 @@ class Runner:
     def compile_src(self, src_dir, src_name):
         print(f"Compiling rendered {src_name}")
         cl_proc = sp.Popen([path.join(self.precompile_path, "VsDevCmd.bat"), "&",
-                            path.join(self.compiler_path, self.compiler_exec), "/EHsc", src_name],
+                            path.join(self.compiler_path, self.compiler_exec), "/EHsc", "/openmp", "/O2", src_name],
                            stdout=sp.PIPE, stderr=sp.PIPE, shell=True,
                            cwd=src_dir)
         stdout, stderr = cl_proc.communicate()
+        print("Compiled successfully")
         # if cl_proc.returncode
 
     def render_src(self, loop, schedule, threads):
@@ -87,6 +93,8 @@ class Runner:
         params = {"threads": threads,
                   "schedule": schedule}
         omp_line = self.env.get_template("lab1.omp.j2").render(**schedule)
+        if loop == "inner":
+            omp_line += " private(c_ij) reduction(+:c_ij)"
         params.update({
             loop: omp_line
         })
@@ -121,11 +129,12 @@ schedules = [
     {"schedule_type": "static"},
     {"schedule_type": "guided"},
     {"schedule_type": "dynamic",
-     "chunk-size": "100"},
+     "chunk_size": "100"},
     {"schedule_type": "static",
-     "chunk-size": "100"},
+     "chunk_size": "100"},
 ]
-sizes = [[500, 500, 500],
+sizes = [
+         [500, 500, 500],
          [800, 800, 800],
          [8000, 80, 800],
          [64000, 8, 800]
@@ -137,9 +146,9 @@ runner = Runner(
 
 total_results = list()
 
-for paralleled_loop in loops:
-    for thread_number in threads:
-        for schedule in schedules:
+for thread_number in threads:
+    for schedule in schedules:
+        for paralleled_loop in loops:
             result = runner.perform_run(paralleled_loop, thread_number, sizes, schedule)
             for size in result:
                 total_results.append(
@@ -149,15 +158,15 @@ for paralleled_loop in loops:
                      "size": size,
                      "duration": result[size]
                      })
-            print(f"done with schedule {schedule_string(schedule)}")
-        print(f"done with thread {thread_number}")
+        print(f"done with schedule {schedule_string(schedule)}")
+    print(f"done with thread {thread_number}")
 
 
 if not total_results:
     exit(-1)
 
 import csv
-with open("lab1_results.csv", "w+") as out:
+with open("lab1_results500.csv", "w+") as out:
     writer = csv.DictWriter(out, total_results[0].keys(), delimiter=";")
     writer.writeheader()
     writer.writerows(total_results)
